@@ -1,6 +1,7 @@
 from .deeponet import DeepONet1D
 from .fno import FNO1d
 from .wno import WNO1d
+from .LSM_1D import LSM1d
 
 def get_model(model_name, **kwargs):
     """
@@ -10,7 +11,8 @@ def get_model(model_name, **kwargs):
     models_dict = {
         "DeepONet": DeepONet1D,
         'FNO': FNO1d,
-        'WNO': WNO1d
+        'WNO': WNO1d,
+        'LSM': LSM1d
     }
     
     if model_name not in models_dict:
