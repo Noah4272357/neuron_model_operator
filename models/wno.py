@@ -65,15 +65,29 @@ class WaveConv1d(nn.Module):
         return x
 
 """ The forward operation """
+
+class WNO1dBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, level, seq_len):
+        super(WNO1dBlock, self).__init__()
+        self.conv = WaveConv1d(in_channels, out_channels, level, seq_len)
+        self.w = nn.Conv1d(in_channels, out_channels, 1)
+
+    def forward(self, x):
+        x1 = self.conv(x)
+        x2 = self.w(x)
+        x = x1 + x2
+        x = F.gelu(x)
+        return x
+
 class WNO1d(nn.Module):
-    def __init__(self, width, level, seq_len):
+    def __init__(self, width, level, seq_len, num_blocks=4):
         super(WNO1d, self).__init__()
 
         """
-        The WNO network. It contains 4 layers of the Wavelet integral layer.
+        The WNO network. It contains num_blocks layers of the Wavelet integral layer.
         1. Lift the input using v(x) = self.fc0 .
-        2. 4 layers of the integral operators v(+1) = g(K(.) + W)(v).
-            W is defined by self.w_; K is defined by self.conv_.
+        2. num_blocks layers of the integral operators v(+1) = g(K(.) + W)(v).
+            W is defined by self.w; K is defined by self.conv .
         3. Project the output of last layer using self.fc1 and self.fc2.
         
         input: the solution of the initial condition and location (a(x), x)
@@ -85,16 +99,13 @@ class WNO1d(nn.Module):
         self.level = level
         self.width = width
         self.padding = 2 # pad the domain when required
+        self.num_blocks = num_blocks
         self.fc0 = nn.Linear(2, self.width) # input channel is 2: (a(x), x)
 
-        self.conv0 = WaveConv1d(self.width, self.width, self.level, seq_len)
-        self.conv1 = WaveConv1d(self.width, self.width, self.level, seq_len)
-        self.conv2 = WaveConv1d(self.width, self.width, self.level, seq_len)
-        self.conv3 = WaveConv1d(self.width, self.width, self.level, seq_len)
-        self.w0 = nn.Conv1d(self.width, self.width, 1)
-        self.w1 = nn.Conv1d(self.width, self.width, 1)
-        self.w2 = nn.Conv1d(self.width, self.width, 1)
-        self.w3 = nn.Conv1d(self.width, self.width, 1)
+        self.blocks = nn.ModuleList([
+            WNO1dBlock(self.width, self.width, self.level, seq_len)
+            for _ in range(self.num_blocks)
+        ])
 
         self.fc1 = nn.Linear(self.width, 128)
         self.fc2 = nn.Linear(128, 1)
@@ -106,24 +117,8 @@ class WNO1d(nn.Module):
         x = x.permute(0, 2, 1)
         # x = F.pad(x, [0,self.padding]) 
 
-        x1 = self.conv0(x)
-        x2 = self.w0(x)
-        x = x1 + x2
-        x = F.gelu(x)
-
-        x1 = self.conv1(x)
-        x2 = self.w1(x)
-        x = x1 + x2
-        x = F.gelu(x)
-
-        x1 = self.conv2(x)
-        x2 = self.w2(x)
-        x = x1 + x2
-        x = F.gelu(x)
-
-        x1 = self.conv3(x)
-        x2 = self.w3(x)
-        x = x1 + x2
+        for block in self.blocks:
+            x = block(x)
 
         # x = x[..., :-self.padding] 
         x = x.permute(0, 2, 1)

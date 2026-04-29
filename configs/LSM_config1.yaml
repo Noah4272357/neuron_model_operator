@@ -1,0 +1,7 @@
+in_dim: 1
+out_dim: 1
+d_model: 64
+num_token: 8
+num_basis: 16
+patch_size: "1"
+padding: "0"
