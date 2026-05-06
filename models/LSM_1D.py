@@ -238,33 +238,31 @@ class LSM1d(nn.Module):
         return gridx.to(device)
 
 
-if __name__ == "__main__":
-    # Unit test for LSM_1D.Model using a random tensor.
-    # Input shape: (batch, seq_len, in_dim)
-    # Output shape: (batch, seq_len, out_dim)
-    batch = 2
-    seq_len = 16
-    in_dim = 1
-    out_dim = 1
+def test_lsm1d_forward_output_shape():
+    from types import SimpleNamespace
+    args = SimpleNamespace(
+        in_dim=1,
+        out_dim=1,
+        d_model=8,
+        num_token=4,
+        num_basis=6,
+        patch_size="1",
+        padding="0",
+    )
+    model = LSM1d(args).eval()
 
-    class Args:
-        pass
+    batch_size = 2
+    seq_len = 32
 
-    args = Args()
-    args.in_dim = in_dim
-    args.out_dim = out_dim
-    args.d_model = 4
-    args.num_token = 4
-    args.num_basis = 4
-    args.patch_size = "1"
-    args.padding = "0"
+    # Input shape: [batch_size, seq_len, in_dim]
+    x = torch.randn(batch_size, seq_len, args.in_dim)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = LSM1d(args).to(device)
+    with torch.no_grad():
+        y = model(x)
 
-    x = torch.randn(batch, seq_len, in_dim, device=device)
-    y = model(x)
+    # Output shape: [batch_size, seq_len, out_dim]
+    assert y.shape == (batch_size, seq_len, args.out_dim)
+    print(y.shape)
 
-    assert y.shape == (batch, seq_len, out_dim), f"Expected output shape {(batch, seq_len, out_dim)}, got {y.shape}"
-    print("LSM_1D unit test passed", y.shape)
-
+if __name__=="__main__":
+    test_lsm1d_forward_output_shape()
