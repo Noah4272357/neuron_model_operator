@@ -61,15 +61,13 @@ class Up(nn.Module):
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
-        # input is CHW
-        # diffY = x2.size()[2] - x1.size()[2]
-        # diffX = x2.size()[3] - x1.size()[3]
+        diff = x2.size(-1) - x1.size(-1)
+        if diff > 0:
+            x1 = F.pad(x1, [diff // 2, diff - diff // 2])
+        elif diff < 0:
+            crop_left = (-diff) // 2
+            x1 = x1[..., crop_left:crop_left + x2.size(-1)]
 
-        # x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
-        #                 diffY // 2, diffY - diffY // 2])
-        # if you have padding issues, see
-        # https://github.com/HaiyongJiang/U-Net-Pytorch-Unstructured-Buggy/commit/0e854509c2cea854e247a9c615f175f76fbb2e3a
-        # https://github.com/xiaopeng-liao/Pytorch-UNet/commit/8ebac70e633bac59fc22bb5195e513d5832fb3bd
         x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
 
@@ -252,7 +250,7 @@ def test_lsm1d_forward_output_shape():
     model = LSM1d(args).eval()
 
     batch_size = 2
-    seq_len = 32
+    seq_len = 5000
 
     # Input shape: [batch_size, seq_len, in_dim]
     x = torch.randn(batch_size, seq_len, args.in_dim)
