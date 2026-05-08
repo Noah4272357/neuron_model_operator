@@ -15,6 +15,11 @@ from utils import get_loss_func  # Define your custom losses here
 def save_checkpoint(state, filename="checkpoint.pth.tar"):
     torch.save(state, filename)
 
+def print_model_parameter_count(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Model parameters: {total_params:,} total, {trainable_params:,} trainable")
+
 def main(args):
         # 1. Load YAML Hyperparameters
     config_path = os.path.join("configs",f"{args.model_config}.yaml")
@@ -25,6 +30,7 @@ def main(args):
 
     # 3. Initialize Model, Loss, and Optimizer
     model = get_model(args.model_name, **model_param).to(device)
+    print_model_parameter_count(model)
     
     train_loader,val_loader = get_dataloader(args.dataset_name,batch_size = args.batch_size)
     criterion = get_loss_func(args.loss_func_name) 
