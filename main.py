@@ -13,6 +13,9 @@ from trainer import Trainer
 from utils import get_loss_func  # Define your custom losses here
 
 def save_checkpoint(state, filename="checkpoint.pth.tar"):
+    checkpoint_dir = os.path.dirname(filename)
+    if checkpoint_dir:
+        os.makedirs(checkpoint_dir, exist_ok=True)
     torch.save(state, filename)
 
 def print_model_parameter_count(model):
@@ -37,7 +40,9 @@ def main(args):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epochs,
                                                     steps_per_epoch=len(train_loader))
-    writer = SummaryWriter(log_dir=f"logs/{args.model_config}_{args.dataset_name}_{args.loss_func_name}")
+    log_dir = f"logs/{args.model_config}_{args.dataset_name}_{args.loss_func_name}"
+    os.makedirs(log_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=log_dir)
     
     trainer = Trainer(model,optimizer,scheduler,criterion,writer,device)
 

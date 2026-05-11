@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchdiffeq import odeint
+from torchdiffeq import odeint_adjoint as odeint
 
 try:
     from .fno import FNOBlock1d
