@@ -1,4 +1,6 @@
 from .losses import *
+from .metrics import *
+
 def get_loss_func(loss_func_name):
     loss_func_dict = {
         'relative_l2': LpLoss(d=1,p=2),

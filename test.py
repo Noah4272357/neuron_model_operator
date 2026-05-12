@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Subset
-from utils import get_loss_func
+from utils import get_loss_func, spike_time_error
 from data.dataset import get_dataset
 
 from models import get_model
@@ -71,20 +71,26 @@ class ModelEvaluator:
         plt.tight_layout()
         plt.savefig('FNO_multi_hh.png')
 
-# --- Example Usage ---
+if __name__ == "__main__":
+    model_name = 'FNO'
+    config_path = os.path.join("configs",f"{model_name}_config1.yaml")
+    with open(config_path, 'r') as f:
+        model_param = yaml.safe_load(f)
+    model = get_model(model_name, **model_param)
 
-model_name = 'FNO'
-config_path = os.path.join("configs",f"{model_name}_config1.yaml")
-with open(config_path, 'r') as f:
-    model_param = yaml.safe_load(f)
-model = get_model(model_name, **model_param)
+    resume_path = os.path.join("checkpoints",f"{model_name}_config1_best.pth.tar")
+    checkpoint = torch.load(resume_path)
+    model.load_state_dict(checkpoint['state_dict'])
 
-resume_path = os.path.join("checkpoints",f"{model_name}_config1_best.pth.tar")
-checkpoint = torch.load(resume_path)
-model.load_state_dict(checkpoint['state_dict'])
-
-_,test_dataset = get_dataset('multi_hh')     
-evaluator = ModelEvaluator(test_dataset, model, {"relative_l2": get_loss_func("relative_l2")})
-perf = evaluator.calculate_performance()
-print(perf)
-#evaluator.visualize_results()
+    _,test_dataset = get_dataset('multi_hh')
+    evaluator = ModelEvaluator(
+        test_dataset,
+        model,
+        {
+            "relative_l2": get_loss_func("relative_l2"),
+            "spike_time_error": spike_time_error,
+        },
+    )
+    perf = evaluator.calculate_performance()
+    print(perf)
+    #evaluator.visualize_results()
