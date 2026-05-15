@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Subset
-from utils import get_loss_func, spike_time_error
+from utils import get_loss_func, spike_time_accuracy
 from data.dataset import get_dataset
 
 from models import get_model
@@ -81,14 +81,15 @@ if __name__ == "__main__":
     resume_path = os.path.join("checkpoints",f"{model_name}_config1_best.pth.tar")
     checkpoint = torch.load(resume_path)
     model.load_state_dict(checkpoint['state_dict'])
+    dataset_name = 'hh_step'
 
-    _,test_dataset = get_dataset('multi_hh')
+    _,test_dataset = get_dataset(dataset_name)
     evaluator = ModelEvaluator(
         test_dataset,
         model,
         {
             "relative_l2": get_loss_func("relative_l2"),
-            "spike_time_error": spike_time_error,
+            "spike_time_accuracy": spike_time_accuracy,
         },
     )
     perf = evaluator.calculate_performance()

@@ -1,5 +1,23 @@
 import torch
 
+class EarlyStopping:
+    def __init__(self, patience, best_loss=float('inf'), counter=0):
+        self.patience = patience
+        self.best_loss = best_loss
+        self.counter = counter
+        self.should_stop = False
+
+    def step(self, val_loss):
+        if val_loss < self.best_loss:
+            self.best_loss = val_loss
+            self.counter = 0
+            return True
+
+        self.counter += 1
+        if self.counter >= self.patience:
+            self.should_stop = True
+        return False
+
 class Trainer:
     def __init__(self, model, optimizer, scheduler, criterion, writer, device):
         self.model = model

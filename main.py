@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from models import get_model
 from data.dataset import get_dataloader
-from trainer import Trainer
+from trainer import EarlyStopping, Trainer
 from utils import get_loss_func  # Define your custom losses here
 
 def save_checkpoint(state, filename="checkpoint.pth.tar"):
@@ -22,6 +22,19 @@ def print_model_parameter_count(model):
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Model parameters: {total_params:,} total, {trainable_params:,} trainable")
+
+def checkpoint_state(epoch, model, optimizer, scheduler, min_val_loss, early_stopping=None):
+    state = {
+        'epoch': epoch + 1,
+        'state_dict': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'scheduler': scheduler.state_dict(),
+        'min_val_loss': min_val_loss,
+    }
+    if early_stopping is not None:
+        state['early_stopping_counter'] = early_stopping.counter
+        state['early_stopping_best_loss'] = early_stopping.best_loss
+    return state
 
 def main(args):
         # 1. Load YAML Hyperparameters
@@ -40,6 +53,8 @@ def main(args):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epochs,
                                                     steps_per_epoch=len(train_loader))
+    
+    
     log_dir = f"logs/{args.model_config}_{args.dataset_name}_{args.loss_func_name}"
     os.makedirs(log_dir, exist_ok=True)
     writer = SummaryWriter(log_dir=log_dir)
@@ -49,6 +64,7 @@ def main(args):
     start_epoch = 0
 
     min_val_loss = float('inf')
+    early_stopping = EarlyStopping(args.patience) if args.early_stopping else None
     # 4. Resume from Checkpoint
     if args.resume_path and os.path.isfile(args.resume_path):
         print(f"--- Loading Checkpoint: {args.resume_path} ---")
@@ -58,6 +74,9 @@ def main(args):
         optimizer.load_state_dict(checkpoint['optimizer'])
         scheduler.load_state_dict(checkpoint['scheduler'])
         min_val_loss = checkpoint.get('min_val_loss',float('inf'))
+        if early_stopping is not None:
+            early_stopping.best_loss = checkpoint.get('early_stopping_best_loss', min_val_loss)
+            early_stopping.counter = checkpoint.get('early_stopping_counter', 0)
         print(f"Resuming from epoch {start_epoch}")
 
     # 5. Training Loop
@@ -65,27 +84,28 @@ def main(args):
     for epoch in pbar:
         # --- Training Logic ---
         trainer.train_one_epoch(train_loader,epoch) 
-        checkpoint_name = f"./checkpoints/{args.model_config}_{args.loss_func_name}_{args.dataset_name}_last.pth.tar"
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'state_dict': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'scheduler': scheduler.state_dict(),
-        }, filename=checkpoint_name)
 
-
-        if (epoch+1)%20 == 0:
+        should_validate = args.early_stopping or (epoch+1)%20 == 0
+        if should_validate:
             val_loss = trainer.validate(val_loader,epoch) 
-            if val_loss<min_val_loss:
+            improved = early_stopping.step(val_loss) if early_stopping is not None else val_loss < min_val_loss
+            if improved:
                 min_val_loss = val_loss
                 checkpoint_name = f"./checkpoints/{args.model_config}_{args.loss_func_name}_{args.dataset_name}_best.pth.tar"
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'state_dict': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'scheduler': scheduler.state_dict(),
-                    'min_val_loss': min_val_loss
-                }, filename=checkpoint_name)
+                save_checkpoint(
+                    checkpoint_state(epoch, model, optimizer, scheduler, min_val_loss, early_stopping),
+                    filename=checkpoint_name
+                )
+
+        checkpoint_name = f"./checkpoints/{args.model_config}_{args.loss_func_name}_{args.dataset_name}_last.pth.tar"
+        save_checkpoint(
+            checkpoint_state(epoch, model, optimizer, scheduler, min_val_loss, early_stopping),
+            filename=checkpoint_name
+        )
+
+        if early_stopping is not None and early_stopping.should_stop:
+            print(f"Early stopping triggered at epoch {epoch + 1}.")
+            break
     writer.close()
     print("Experiment Complete.")
 
@@ -101,6 +121,8 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--resume_path", type=str, default=None, help="Path to .pth.tar checkpoint")
+    parser.add_argument("--early_stopping", action="store_true", help="Enable early stopping based on validation loss")
+    parser.add_argument("--patience", type=int, default=10, help="Epochs without validation improvement before early stopping")
 
     args = parser.parse_args()
 

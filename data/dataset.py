@@ -4,13 +4,25 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 
 
 DATASET_REGISTRY = {
-    'multi_hh': {
+    'hh_step': {
         'path': '../neuron_data/hh_step_500.npz',
         'feature_key': 'I_ext',
         'label_key': 'V',
         'grid_key': 'time',
     },
-    'multi_izhikevich': {
+    'hh_poisson': {
+        'path': '../neuron_data/hh_poisson_500.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
+        'grid_key': 'time',
+    },
+    'hh_ou': {
+        'path': '../neuron_data/hh_ou_500.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
+        'grid_key': 'time',
+    },
+    'izhikevich_step': {
         'path': '../neuron_data/izhikevich_step_500.npz',
         'feature_key': 'I_ext',
         'label_key': 'V',
