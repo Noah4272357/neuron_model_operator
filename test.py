@@ -24,6 +24,11 @@ class ModelEvaluator:
         self.device = next(model.parameters()).device
         self.model.eval()
 
+    def _to_original_scale(self, values):
+        if hasattr(self.dataset, "inverse_transform_label"):
+            return self.dataset.inverse_transform_label(values)
+        return values
+
     def calculate_performance(self, batch_size=32):
         """Method 1: Run metrics across the entire test dataset."""
         loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
@@ -34,6 +39,8 @@ class ModelEvaluator:
             for input, labels, grid in loader:
                 input, labels, grid = input.to(self.device), labels.to(self.device), grid.to(self.device)
                 outputs = self.model(input,grid).reshape(labels.shape)
+                outputs = self._to_original_scale(outputs)
+                labels = self._to_original_scale(labels)
                 
                 # Update each metric
                 for name, metric_fn in self.metrics.items():
@@ -57,6 +64,8 @@ class ModelEvaluator:
         
         with torch.no_grad():
             outputs = self.model(input.to(self.device), grid.to(self.device))
+            outputs = self._to_original_scale(outputs)
+            labels = self._to_original_scale(labels.to(self.device)).cpu()
 
         # Plotting
         plt.figure(figsize=(20,8))

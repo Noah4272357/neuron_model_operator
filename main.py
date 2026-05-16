@@ -48,14 +48,22 @@ def main(args):
     model = get_model(args.model_name, **model_param).to(device)
     print_model_parameter_count(model)
     
-    train_loader,val_loader = get_dataloader(args.dataset_name,batch_size = args.batch_size)
+    train_loader,val_loader = get_dataloader(
+        args.dataset_name,
+        batch_size=args.batch_size,
+        normalize_labels=args.normalize_labels,
+    )
     criterion = get_loss_func(args.loss_func_name) 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epochs,
                                                     steps_per_epoch=len(train_loader))
     
     
-    log_dir = f"logs/{args.model_config}_{args.dataset_name}_{args.loss_func_name}"
+    run_name = f"{args.model_config}_{args.dataset_name}_{args.loss_func_name}"
+    if args.normalize_labels:
+        run_name = f"{run_name}_normalized_labels"
+
+    log_dir = f"logs/{run_name}"
     os.makedirs(log_dir, exist_ok=True)
     writer = SummaryWriter(log_dir=log_dir)
     
@@ -91,13 +99,13 @@ def main(args):
             improved = early_stopping.step(val_loss) if early_stopping is not None else val_loss < min_val_loss
             if improved:
                 min_val_loss = val_loss
-                checkpoint_name = f"./checkpoints/{args.model_config}_{args.loss_func_name}_{args.dataset_name}_best.pth.tar"
+                checkpoint_name = f"./checkpoints/{run_name}_best.pth.tar"
                 save_checkpoint(
                     checkpoint_state(epoch, model, optimizer, scheduler, min_val_loss, early_stopping),
                     filename=checkpoint_name
                 )
 
-        checkpoint_name = f"./checkpoints/{args.model_config}_{args.loss_func_name}_{args.dataset_name}_last.pth.tar"
+        checkpoint_name = f"./checkpoints/{run_name}_last.pth.tar"
         save_checkpoint(
             checkpoint_state(epoch, model, optimizer, scheduler, min_val_loss, early_stopping),
             filename=checkpoint_name
@@ -123,6 +131,7 @@ if __name__ == "__main__":
     parser.add_argument("--resume_path", type=str, default=None, help="Path to .pth.tar checkpoint")
     parser.add_argument("--early_stopping", action="store_true", help="Enable early stopping based on validation loss")
     parser.add_argument("--patience", type=int, default=10, help="Epochs without validation improvement before early stopping")
+    parser.add_argument("--normalize_labels", action="store_true", help="Min-max normalize labels using train-set statistics")
 
     args = parser.parse_args()
 
