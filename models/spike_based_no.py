@@ -103,15 +103,13 @@ class SpikeBasedNO(nn.Module):
                                 nn.Linear(lift_dim, self.width),
                                  nn.GELU(),
                                 nn.Linear(self.width,out_channels))
-        self.impulse_shape = nn.Sequential(nn.Linear(in_channels, embed_dim),
-                                           nn.GELU(),
-                                           nn.Linear(embed_dim, shape_width))
+        impulse_shape = torch.zeros(shape_width)
+        impulse_shape[shape_width // 2] = 1.0
+        self.impulse_shape = nn.Parameter(impulse_shape)
         
 
     def forward(self, x, grid):
         input_features = torch.stack((x, grid),dim=-1)
-        impulse_shape = self.impulse_shape(input_features).mean(dim=1)
-        impulse_shape = F.softmax(impulse_shape, dim=-1)
 
         x = self.fc0(input_features)
         x = x.permute(0, 2, 1)
@@ -131,7 +129,7 @@ class SpikeBasedNO(nn.Module):
         right_padding = self.shape_width - 1 - left_padding
         x = x.permute(0, 2, 1).reshape(1, batch_size, -1)
         x = F.pad(x, [left_padding, right_padding])
-        impulse_shape = impulse_shape.reshape(batch_size, 1, self.shape_width)
+        impulse_shape = self.impulse_shape.reshape(1, 1, self.shape_width).repeat(batch_size, 1, 1)
         x = F.conv1d(x, impulse_shape, groups=batch_size)
         x = x.reshape(batch_size, 1, -1).permute(0, 2, 1)
         return x
