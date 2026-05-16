@@ -3,6 +3,7 @@ from .fno import FNO1d
 from .neural_ode import NeuralODE1d
 from .wno import WNO1d
 from .LSM_1D import LSM1d
+from .spike_based_no import SpikeBasedNO
 
 def get_model(model_name, **kwargs):
     """
@@ -14,7 +15,8 @@ def get_model(model_name, **kwargs):
         'FNO': FNO1d,
         'NeuralODE': NeuralODE1d,
         'WNO': WNO1d,
-        'LSM': LSM1d
+        'LSM': LSM1d,
+        'SpikeBasedNO': SpikeBasedNO
     }
     
     if model_name not in models_dict:
