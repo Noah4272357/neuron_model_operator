@@ -4,31 +4,77 @@ from torch.utils.data import Dataset, DataLoader
 
 
 DATASET_REGISTRY = {
+    'lif_step': {
+        'path': '../neuron_data/lif_step_300.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
+        'grid_key': 'time',
+    },'BBP_poisson': {
+        'path': '../neuron_data/BBP_poisson_300.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
+        'grid_key': 'time',
+    },'lif_poisson': {
+        'path': '../neuron_data/lif_poisson_300.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
+        'grid_key': 'time',
+    },'hh_step': {
+        'path': '../neuron_data/hh_step_300.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
+        'grid_key': 'time',
+    },
     'hh_step': {
-        'path': '../neuron_data/hh_step_500.npz',
+        'path': '../neuron_data/hh_step_300.npz',
         'feature_key': 'I_ext',
         'label_key': 'V',
         'grid_key': 'time',
-    },
+    }, 
+    'inverse_hh_step': {
+        'path': '../neuron_data/hh_step_300.npz',
+        'feature_key': 'V',
+        'label_key': 'I_ext',
+        'grid_key': 'time',
+    }, 
     'hh_poisson': {
-        'path': '../neuron_data/hh_poisson_500.npz',
+        'path': '../neuron_data/hh_poisson_300.npz',
         'feature_key': 'I_ext',
         'label_key': 'V',
         'grid_key': 'time',
     },
-    'hh_ou': {
-        'path': '../neuron_data/hh_ou_500.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
+    'inverse_hh_poisson': {
+        'path': '../neuron_data/hh_poisson_300.npz',
+        'feature_key': 'V',
+        'label_key': 'I_ext',
         'grid_key': 'time',
     },
     'izhikevich_step': {
-        'path': '../neuron_data/izhikevich_step_500.npz',
+        'path': '../neuron_data/izhikevich_step_300.npz',
         'feature_key': 'I_ext',
         'label_key': 'V',
         'grid_key': 'time',
     },
+    'inverse_izhikevich_step': {
+        'path': '../neuron_data/izhikevich_step_300.npz',
+        'feature_key': 'V',
+        'label_key': 'I_ext',
+        'grid_key': 'time',
+    },
+    'izhikevich_poisson': {
+        'path': '../neuron_data/izhikevich_poisson_300.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
+        'grid_key': 'time',
+    },
+    'inverse_izhikevich_poisson': {
+        'path': '../neuron_data/izhikevich_poisson_300.npz',
+        'feature_key': 'V',
+        'label_key': 'I_ext',
+        'grid_key': 'time',
+    },
 }
+
 
 
 def _get_dataset_config(dataset_name):
