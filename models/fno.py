@@ -102,6 +102,6 @@ class FNO1d(nn.Module):
         x = x[..., :-self.padding]
         x = x.permute(0, 2, 1)
         x = self.fc1(x)
-        return x
+        return x.squeeze(-1)
 
 
