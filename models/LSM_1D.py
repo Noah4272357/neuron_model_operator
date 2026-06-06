@@ -4,7 +4,6 @@
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-import numpy as np
 import math
 
 
@@ -85,7 +84,7 @@ class OutConv(nn.Module):
 # Patchify and Neural Spectral Block
 ################################################################
 class NeuralSpectralBlock2d(nn.Module):
-    def __init__(self, width, num_basis, patch_size=[3], num_token=4):
+    def __init__(self, width, num_basis, patch_size=3, num_token=4):
         super(NeuralSpectralBlock2d, self).__init__()
         self.patch_size = patch_size
         self.width = width
@@ -115,31 +114,34 @@ class NeuralSpectralBlock2d(nn.Module):
     def latent_encoder_attn(self, x):
         # x: B C H W
         B, C, H = x.shape
-        L = H 
-        latent_token = self.latent[None, :, :, :].repeat(B, 1, 1, 1)
-        x_tmp = self.encoder_attn(x).view(B, C * 2, -1).permute(0, 2, 1).contiguous() \
-            .view(B, L, self.head, C // self.head, 2).permute(4, 0, 2, 1, 3).contiguous()
+        L = H
+        latent_token = self.latent.unsqueeze(0).expand(B, -1, -1, -1)
+        x_tmp = self.encoder_attn(x).reshape(B, C * 2, -1).permute(0, 2, 1) \
+            .reshape(B, L, self.head, C // self.head, 2).permute(4, 0, 2, 1, 3)
         latent_token = self.self_attn(latent_token, x_tmp[0], x_tmp[1]) + latent_token
-        latent_token = latent_token.permute(0, 1, 3, 2).contiguous().view(B, C, self.num_token)
+        latent_token = latent_token.permute(0, 1, 3, 2).reshape(B, C, self.num_token)
         return latent_token
 
     def latent_decoder_attn(self, x, latent_token):
         # x: B C L
         x_init = x
         B, C, H = x.shape
-        L = H 
-        latent_token = latent_token.view(B, self.head, C // self.head, self.num_token).permute(0, 1, 3, 2).contiguous()
-        x_tmp = self.decoder_attn(x).view(B, C, -1).permute(0, 2, 1).contiguous() \
-            .view(B, L, self.head, C // self.head).permute(0, 2, 1, 3).contiguous()
+        L = H
+        latent_token = latent_token.reshape(B, self.head, C // self.head, self.num_token).permute(0, 1, 3, 2)
+        x_tmp = self.decoder_attn(x).reshape(B, C, -1).permute(0, 2, 1) \
+            .reshape(B, L, self.head, C // self.head).permute(0, 2, 1, 3)
         x = self.self_attn(x_tmp, latent_token, latent_token)
-        x = x.permute(0, 1, 3, 2).contiguous().view(B, C, H) + x_init  # B H L C/H
+        x = x.permute(0, 1, 3, 2).reshape(B, C, H) + x_init  # B H L C/H
         return x
 
-    def get_basis(self, x):
+    def apply_basis_projection(self, x):
         # x: B C N
-        x_sin = torch.sin(self.modes_list[None, None, None, :] * x[:, :, :, None] * math.pi)
-        x_cos = torch.cos(self.modes_list[None, None, None, :] * x[:, :, :, None] * math.pi)
-        return torch.cat([x_sin, x_cos], dim=-1)
+        modes = self.modes_list[None, None, None, :] * x[:, :, :, None] * math.pi
+        sin_weights, cos_weights = self.weights.chunk(2, dim=-1)
+        return (
+            torch.einsum("bilm,im->bil", torch.sin(modes), sin_weights)
+            + torch.einsum("bilm,im->bil", torch.cos(modes), cos_weights)
+        )
 
     def compl_mul2d(self, input, weights):
         return torch.einsum("bilm,im->bil", input, weights)
@@ -148,35 +150,38 @@ class NeuralSpectralBlock2d(nn.Module):
         B, C, H = x.shape
         # print(x.shape)
         # patchify
-        x = x.view(x.shape[0], x.shape[1],
-                   x.shape[2] // self.patch_size[0], self.patch_size[0]).contiguous() \
-            .permute(0, 3, 1, 2).contiguous() \
-            .view(x.shape[0] * (x.shape[2] // self.patch_size[0]) , x.shape[1],
-                  self.patch_size[0])
+        x = x.reshape(B, C, H // self.patch_size, self.patch_size) \
+            .permute(0, 3, 1, 2) \
+            .reshape(B * (H // self.patch_size), C, self.patch_size)
         # Neural Spectral
         # (1) encoder
         latent_token = self.latent_encoder_attn(x)
         # (2) transition
-        latent_token_modes = self.get_basis(latent_token)
-        latent_token = self.compl_mul2d(latent_token_modes, self.weights) + latent_token
+        latent_token = self.apply_basis_projection(latent_token) + latent_token
         # (3) decoder
         x = self.latent_decoder_attn(x, latent_token)
         # de-patchify
-        x = x.view(B, (H // self.patch_size[0]), C, self.patch_size[0]).permute(0, 2, 1, 3).contiguous() \
-            .view(B, C, H).contiguous()
+        x = x.reshape(B, H // self.patch_size, C, self.patch_size).permute(0, 2, 1, 3) \
+            .reshape(B, C, H)
         return x
 
 
 class LSM1d(nn.Module):
-    def __init__(self, args, bilinear=True):
+    def __init__(
+        self,
+        in_channels=2,
+        out_channels=1,
+        width=64,
+        lift_dim=128,
+        num_token=8,
+        num_basis=16,
+        patch_size=1,
+        padding=0,
+        bilinear=True,
+    ):
         super(LSM1d, self).__init__()
-        in_channels = args.in_dim
-        out_channels = args.out_dim
-        width = args.d_model
-        num_token = args.num_token
-        num_basis = args.num_basis
-        patch_size = [int(x) for x in args.patch_size.split(',')]
-        padding = [int(x) for x in args.padding.split(',')]
+        patch_size = self._parse_int_value(patch_size)
+        padding = self._parse_int_value(padding)
         # multiscale modules
         self.inc = DoubleConv(width, width)
         self.down1 = Down(width, width * 2)
@@ -197,18 +202,31 @@ class LSM1d(nn.Module):
         self.process5 = NeuralSpectralBlock2d(width * 16 // factor, num_basis, patch_size, num_token)
         # projectors
         self.padding = padding
-        self.fc0 = nn.Linear(in_channels + 1, width)
-        self.fc1 = nn.Linear(width, 128)
-        self.fc2 = nn.Linear(128, out_channels)
+        self.fc0 = nn.Linear(in_channels, width)
+        self.fc1 = nn.Linear(width, lift_dim)
+        self.fc2 = nn.Linear(lift_dim, out_channels)
 
-    def forward(self, x):
-        grid = self.get_grid(x.shape, x.device)
-        x = torch.cat((x, grid), dim=-1)
+    @staticmethod
+    def _parse_int_value(value):
+        if isinstance(value, str):
+            value = value.split(",")[0]
+        return int(value)
+
+    def forward(self, x, grid):
+        if x.dim() == 2:
+            x = torch.stack((x, grid), dim=-1)
+        elif x.dim() == 3:
+            if grid.dim() == 2:
+                grid = grid.unsqueeze(-1)
+            x = torch.cat((x, grid), dim=-1)
+        else:
+            raise ValueError(f"Expected x to have shape [B, S] or [B, S, C], got {tuple(x.shape)}.")
+
         x = self.fc0(x)
         x = x.permute(0, 2, 1)
 
-        if not all(item == 0 for item in self.padding):
-            x = F.pad(x, [0, self.padding[0]])
+        if self.padding:
+            x = F.pad(x, [0, self.padding])
 
         x1 = self.inc(x)
         x2 = self.down1(x1)
@@ -221,45 +239,42 @@ class LSM1d(nn.Module):
         x = self.up4(x, self.process1(x1))
         x = self.outc(x)
 
-        if not all(item == 0 for item in self.padding):
-            x = x[...,  :-self.padding[0]]
+        if self.padding:
+            x = x[..., :-self.padding]
         x = x.permute(0, 2, 1)
         x = self.fc1(x)
         x = F.gelu(x)
         x = self.fc2(x)
-        return x
-
-    def get_grid(self, shape, device):
-        batchsize, size_x = shape[0], shape[1]
-        gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
-        gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
-        return gridx.to(device)
+        return x.squeeze(-1)
 
 
 def test_lsm1d_forward_output_shape():
-    from types import SimpleNamespace
-    args = SimpleNamespace(
-        in_dim=1,
-        out_dim=1,
-        d_model=8,
+    model = LSM1d(
+        in_channels=2,
+        out_channels=1,
+        width=8,
         num_token=4,
         num_basis=6,
-        patch_size="1",
-        padding="0",
-    )
-    model = LSM1d(args).eval()
+        patch_size=1,
+        padding=0,
+    ).eval()
 
     batch_size = 2
     seq_len = 5000
 
-    # Input shape: [batch_size, seq_len, in_dim]
-    x = torch.randn(batch_size, seq_len, args.in_dim)
+    x = torch.randn(batch_size, seq_len)
+    grid = torch.linspace(0, 1, seq_len).repeat(batch_size, 1)
 
     with torch.no_grad():
-        y = model(x)
+        y = model(x, grid)
 
-    # Output shape: [batch_size, seq_len, out_dim]
-    assert y.shape == (batch_size, seq_len, args.out_dim)
+    assert y.shape == (batch_size, seq_len)
+
+    x = x.unsqueeze(-1)
+    with torch.no_grad():
+        y = model(x, grid)
+
+    assert y.shape == (batch_size, seq_len)
     print(y.shape)
 
 if __name__=="__main__":

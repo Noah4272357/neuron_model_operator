@@ -1,0 +1,7 @@
+in_channel: 1,
+out_channel: 1,
+embed_dim: 96,
+num_heads: 4,
+encoder_layers: 4,
+decoder_layers: 3,
+mlp_ratio: 4,

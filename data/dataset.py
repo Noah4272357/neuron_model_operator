@@ -9,6 +9,11 @@ DATASET_REGISTRY = {
         'feature_key': 'I_ext',
         'label_key': 'V',
         'grid_key': 'time',
+    },'inverse_BBP_poisson': {
+        'path': '../neuron_data/BBP_poisson_300.npz',
+        'feature_key': 'V',
+        'label_key': 'I_ext',
+        'grid_key': 'time',
     },'BBP_poisson': {
         'path': '../neuron_data/BBP_poisson_300.npz',
         'feature_key': 'I_ext',
@@ -25,22 +30,10 @@ DATASET_REGISTRY = {
         'label_key': 'V',
         'grid_key': 'time',
     },
-    'hh_step': {
-        'path': '../neuron_data/hh_step_300.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    }, 
-    'inverse_hh_step': {
+     'inverse_hh_step': {
         'path': '../neuron_data/hh_step_300.npz',
         'feature_key': 'V',
         'label_key': 'I_ext',
-        'grid_key': 'time',
-    }, 
-    'hh_poisson': {
-        'path': '../neuron_data/hh_poisson_300.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
         'grid_key': 'time',
     },
     'inverse_hh_poisson': {
@@ -49,20 +42,20 @@ DATASET_REGISTRY = {
         'label_key': 'I_ext',
         'grid_key': 'time',
     },
-    'izhikevich_step': {
-        'path': '../neuron_data/izhikevich_step_300.npz',
+    'hh_poisson': {
+        'path': '../neuron_data/new_hh_poisson_300.npz',
         'feature_key': 'I_ext',
         'label_key': 'V',
         'grid_key': 'time',
     },
-    'inverse_izhikevich_step': {
-        'path': '../neuron_data/izhikevich_step_300.npz',
-        'feature_key': 'V',
-        'label_key': 'I_ext',
+    'hh_ou': {
+        'path': '../neuron_data/hh_ou_500.npz',
+        'feature_key': 'I_ext',
+        'label_key': 'V',
         'grid_key': 'time',
     },
-    'izhikevich_poisson': {
-        'path': '../neuron_data/izhikevich_poisson_300.npz',
+    'izhikevich_step': {
+        'path': '../neuron_data/izhikevich_step_500.npz',
         'feature_key': 'I_ext',
         'label_key': 'V',
         'grid_key': 'time',

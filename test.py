@@ -53,7 +53,7 @@ class ModelEvaluator:
         final_performance = {name: score / len(loader) for name, score in results.items()}
         return final_performance
 
-    def visualize_results(self,sample_size=5): 
+    def visualize_results(self,fig_name='results.png',sample_size=5): 
         """Method 2: Randomly select samples and plot predictions."""
         # Randomly sample indices
         indices = np.random.choice(len(self.dataset), sample_size, replace=False)
@@ -78,29 +78,39 @@ class ModelEvaluator:
             plt.plot(grid[i].cpu().numpy(),input[i].cpu().numpy(), label = 'Current')
             plt.legend()
         plt.tight_layout()
-        plt.savefig('FNO_multi_hh.png')
+        plt.savefig(fig_name)
 
-if __name__ == "__main__":
-    model_name = 'FNO'
+#if __name__ == "__main__":
+#    model_name = 'FNO'
+#    config_path = os.path.join("configs",f"{model_name}_config1.yaml")
+#    with open(config_path, 'r') as f:
+#        model_param = yaml.safe_load(f)
+#    model = get_model(model_name, **model_param)
+
+models = ['FNO']
+for model_name in models:
     config_path = os.path.join("configs",f"{model_name}_config1.yaml")
     with open(config_path, 'r') as f:
         model_param = yaml.safe_load(f)
     model = get_model(model_name, **model_param)
+    loss_func_name = 'relative_l2'
+    dataset_name_list = ['hh_step','hh_poisson']
 
-    resume_path = os.path.join("checkpoints",f"{model_name}_config1_best.pth.tar")
-    checkpoint = torch.load(resume_path)
-    model.load_state_dict(checkpoint['state_dict'])
-    dataset_name = 'hh_step'
+    for dataset_name in dataset_name_list:
 
-    _,test_dataset = get_dataset(dataset_name)
-    evaluator = ModelEvaluator(
-        test_dataset,
-        model,
-        {
-            "relative_l2": get_loss_func("relative_l2"),
-            "spike_time_accuracy": spike_time_accuracy,
-        },
-    )
-    perf = evaluator.calculate_performance()
-    print(perf)
-    #evaluator.visualize_results()
+        resume_path = os.path.join("checkpoints",f"{model_name}_config1_{dataset_name}_{loss_func_name}_last.pth.tar")
+        checkpoint = torch.load(resume_path)
+        model.load_state_dict(checkpoint['state_dict'])
+    
+        train_dataset,test_dataset = get_dataset(dataset_name)
+        evaluator = ModelEvaluator(
+            test_dataset,
+            model,
+            {
+                "relative_l2": get_loss_func("relative_l2"),
+                "spike_time_accuracy": spike_time_accuracy,
+            },
+        )
+        perf = evaluator.calculate_performance()
+        print(f'{model_name}: {perf}')
+        evaluator.visualize_results(fig_name = f'{model_name}_{dataset_name}_test_results.png')

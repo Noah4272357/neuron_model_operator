@@ -6,7 +6,6 @@ This code belongs to the paper:
 -- This code is for 1-D Burger's equation (time-independent problem).
 """
 
-import pywt
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,12 +14,7 @@ from pytorch_wavelets import DWT1D, IDWT1D
 torch.manual_seed(0)
 np.random.seed(0)
 
-#def get_model(pde_name,width=64,level=8):
-#    if pde_name.endswith('BBP'):
-#        model = WNO1d(width, level, seq_len=3000)
-#    else:
-#        raise NotImplementedError('PDE not implemented')
-#    return model
+
 """ Def: 1d Wavelet layer """
 class WaveConv1d(nn.Module):
     def __init__(self, in_channels, out_channels, level, seq_len, device='cuda'):
