@@ -119,6 +119,6 @@ class WNO1d(nn.Module):
         x = self.fc1(x)
         x = F.gelu(x)
         x = self.fc2(x)
-        return x
+        return x.squeeze(-1)
 
     

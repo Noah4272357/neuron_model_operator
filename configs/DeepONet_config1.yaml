@@ -1,2 +1,6 @@
-size: 5000
+size: 3000
 query_dim: 1
+in_channel_branch: 1
+out_channel: 1
+width: 256
+depth: 10

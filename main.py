@@ -54,11 +54,14 @@ def main(args):
         normalize_labels=args.normalize_labels,
     )
     criterion = get_loss_func(args.loss_func_name) 
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epochs,
-                                                    steps_per_epoch=len(train_loader))
-    
-    
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=10,
+    )
+
     run_name = f"{args.model_config}_{args.dataset_name}_{args.loss_func_name}"
     if args.normalize_labels:
         run_name = f"{run_name}_normalized_labels"
@@ -93,17 +96,16 @@ def main(args):
         # --- Training Logic ---
         trainer.train_one_epoch(train_loader,epoch) 
 
-        should_validate = args.early_stopping or (epoch+1)%20 == 0
-        if should_validate:
-            val_loss = trainer.validate(val_loader,epoch) 
-            improved = early_stopping.step(val_loss) if early_stopping is not None else val_loss < min_val_loss
-            if improved:
-                min_val_loss = val_loss
-                checkpoint_name = f"./checkpoints/{run_name}_best.pth.tar"
-                save_checkpoint(
-                    checkpoint_state(epoch, model, optimizer, scheduler, min_val_loss, early_stopping),
-                    filename=checkpoint_name
-                )
+        val_loss = trainer.validate(val_loader,epoch)
+        scheduler.step(val_loss)
+        improved = early_stopping.step(val_loss) if early_stopping is not None else val_loss < min_val_loss
+        if improved:
+            min_val_loss = val_loss
+            checkpoint_name = f"./checkpoints/{run_name}_best.pth.tar"
+            save_checkpoint(
+                checkpoint_state(epoch, model, optimizer, scheduler, min_val_loss, early_stopping),
+                filename=checkpoint_name
+            )
 
         checkpoint_name = f"./checkpoints/{run_name}_last.pth.tar"
         save_checkpoint(
@@ -122,11 +124,11 @@ if __name__ == "__main__":
 
     # --- CLI Arguments ---
     parser.add_argument("--model_name", type=str, default='WNO')
-    parser.add_argument("--dataset_name", type=str, default = 'multi_izhikevich')
+    parser.add_argument("--dataset_name", type=str, default = 'hh_step')
     parser.add_argument("--model_config", type=str, default = 'WNO_config1',help="Path to YAML config")
     parser.add_argument("--loss_func_name", type=str, default="relative_l2")
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=500)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--resume_path", type=str, default=None, help="Path to .pth.tar checkpoint")
     parser.add_argument("--early_stopping", action="store_true", help="Enable early stopping based on validation loss")

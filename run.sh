@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define arrays for comparison
-MODELS=("FNO")
+MODELS=("DeepONet" "WNO" "Fourier_Transformer")
 LOSS_FUNC=("relative_l2")
 DATASETS=("hh_step" "hh_poisson")
 CONFIGS=("1")

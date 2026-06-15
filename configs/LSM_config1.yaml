@@ -1,8 +1,0 @@
-in_channels: 2
-out_channels: 1
-width: 64
-lift_dim: 128
-num_token: 8
-num_basis: 16
-patch_size: 1
-padding: 0

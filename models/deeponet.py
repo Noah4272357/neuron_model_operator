@@ -11,13 +11,15 @@ class DeepONet1D(nn.Module):
         query_dim: int ,
         in_channel_branch: int=1,
         out_channel: int=1,
+        width: int = 128,
+        depth: int = 6,
         activation: str = "gelu",
         kernel_initializer: str = "Glorot normal"):
         super().__init__()
         in_channel_branch=in_channel_branch*size
         in_channel_trunk=query_dim
-        out_channel_branch=out_channel_trunk=128*out_channel
-        layer_sizes=[64]*4
+        out_channel_branch=out_channel_trunk=width*out_channel
+        layer_sizes=[width]*depth
         
         activation_branch = self.activation_trunk = _get_act(activation)
         

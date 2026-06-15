@@ -47,12 +47,11 @@ class Trainer:
             
             self.optimizer.step()
             self.global_step += 1
-            
+
         # Log LR once per epoch
         self.writer.add_scalar('Loss/train', train_loss/len(dataloader), epoch)
         self.writer.add_scalar('Epoch/LR', self.optimizer.param_groups[0]['lr'], epoch)
         
-        self.scheduler.step()
 
     def _get_grad_norm(self):
         total_norm = 0

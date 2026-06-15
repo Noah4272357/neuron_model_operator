@@ -1,3 +1,4 @@
 width: 64
 level: 8
-seq_len: 5000
+seq_len: 3000
+num_blocks: 12

@@ -9,7 +9,7 @@ _MODEL_REGISTRY = {
     "WNO": ("models.wno", "WNO1d"),
     "LSM": ("models.LSM_1D", "LSM1d"),
     "SpikeBasedNO": ("models.spike_based_no", "SpikeBasedNO"),
-    "FourierTransformer": ("models.fourier_transformer", "FourierTransformer1D"),
+    "Fourier_Transformer": ("models.fourier_transformer", "FourierTransformer1D"),
 }
 
 _CLASS_EXPORTS = {

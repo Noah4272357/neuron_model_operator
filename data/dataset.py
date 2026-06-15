@@ -3,89 +3,68 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 
+FEATURE_KEY = "I_ext"
+LABEL_KEY = "V"
+GRID_KEY = "time"
+INVERSE_PREFIX = "inverse_"
+
 DATASET_REGISTRY = {
-    'lif_step': {
-        'path': '../neuron_data/lif_step_300.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    },'inverse_BBP_poisson': {
-        'path': '../neuron_data/BBP_poisson_300.npz',
-        'feature_key': 'V',
-        'label_key': 'I_ext',
-        'grid_key': 'time',
-    },'BBP_poisson': {
-        'path': '../neuron_data/BBP_poisson_300.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    },'lif_poisson': {
-        'path': '../neuron_data/lif_poisson_300.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    },'hh_step': {
-        'path': '../neuron_data/hh_step_300.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    },
-     'inverse_hh_step': {
-        'path': '../neuron_data/hh_step_300.npz',
-        'feature_key': 'V',
-        'label_key': 'I_ext',
-        'grid_key': 'time',
-    },
-    'inverse_hh_poisson': {
-        'path': '../neuron_data/hh_poisson_300.npz',
-        'feature_key': 'V',
-        'label_key': 'I_ext',
-        'grid_key': 'time',
-    },
-    'hh_poisson': {
-        'path': '../neuron_data/new_hh_poisson_300.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    },
-    'hh_ou': {
-        'path': '../neuron_data/hh_ou_500.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    },
-    'izhikevich_step': {
-        'path': '../neuron_data/izhikevich_step_500.npz',
-        'feature_key': 'I_ext',
-        'label_key': 'V',
-        'grid_key': 'time',
-    },
-    'inverse_izhikevich_poisson': {
-        'path': '../neuron_data/izhikevich_poisson_300.npz',
-        'feature_key': 'V',
-        'label_key': 'I_ext',
-        'grid_key': 'time',
-    },
+    "lif_step": "../neuron_data/lif_step_300.npz",
+    "BBP_poisson": "../neuron_data/BBP_poisson_300.npz",
+    "lif_poisson": "../neuron_data/lif_poisson_300.npz",
+    "hh_step": "../neuron_data/hh_step_300.npz",
+    "hh_poisson": "../neuron_data/new_hh_poisson_300.npz",
+    "hh_ou": "../neuron_data/hh_ou_500.npz",
+    "izhikevich_step": "../neuron_data/izhikevich_step_500.npz",
+    "izhikevich_poisson": "../neuron_data/izhikevich_poisson_300.npz",
 }
 
 
+def _available_dataset_names():
+    names = set(DATASET_REGISTRY)
+    names.update(f"{INVERSE_PREFIX}{name}" for name in DATASET_REGISTRY)
+    return sorted(names)
+
 
 def _get_dataset_config(dataset_name):
-    if dataset_name not in DATASET_REGISTRY:
-        available = ', '.join(sorted(DATASET_REGISTRY))
-        raise ValueError(f"Unknown dataset '{dataset_name}'. Available datasets: {available}")
-    return DATASET_REGISTRY[dataset_name]
+    is_inverse = dataset_name.startswith(INVERSE_PREFIX)
+    base_name = (
+        dataset_name[len(INVERSE_PREFIX):]
+        if is_inverse
+        else dataset_name
+    )
+    if base_name not in DATASET_REGISTRY:
+        available = ", ".join(_available_dataset_names())
+        raise ValueError(
+            f"Unknown dataset '{dataset_name}'. "
+            f"Available datasets: {available}"
+        )
+
+    feature_key, label_key = (
+        (LABEL_KEY, FEATURE_KEY)
+        if is_inverse
+        else (FEATURE_KEY, LABEL_KEY)
+    )
+    return {
+        "path": DATASET_REGISTRY[base_name],
+        "feature_key": feature_key,
+        "label_key": label_key,
+        "grid_key": GRID_KEY,
+    }
 
 
 def _load_npz_dataset(config):
-    data = np.load(config['path'])
+    data = np.load(config["path"])
     try:
-        features = data[config['feature_key']]
-        labels = data[config['label_key']]
-        grids = data[config['grid_key']]
+        features = data[config["feature_key"]]
+        labels = data[config["label_key"]]
+        grids = data[config["grid_key"]]
     except KeyError as exc:
-        available_keys = ', '.join(data.files)
-        raise KeyError(f"Missing key {exc} in {config['path']}. Available keys: {available_keys}") from exc
+        available_keys = ", ".join(data.files)
+        raise KeyError(
+            f"Missing key {exc} in {config['path']}. "
+            f"Available keys: {available_keys}"
+        ) from exc
     return features, labels, grids
 
 
@@ -155,8 +134,9 @@ def _split_indices(total_size, ntrain, ntest, seed):
 def get_dataset(dataset_name, ntrain=1000, ntest=None, seed=42, normalize_labels=False):
     """Load a dataset by name and return random train/test subsets.
 
-    To add a new dataset, add one entry to DATASET_REGISTRY with its npz path
-    and the keys for features, labels, and grids.
+    Add a base name and NPZ path to ``DATASET_REGISTRY`` to support both the
+    forward name and its ``inverse_`` counterpart. Files must contain the
+    ``I_ext``, ``V``, and ``time`` arrays.
     """
     config = _get_dataset_config(dataset_name)
     features, labels, grids = _load_npz_dataset(config)
