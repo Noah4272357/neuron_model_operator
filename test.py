@@ -114,32 +114,140 @@ class ModelEvaluator:
         performance["ISI_values_valid_samples"] = valid_counts["ISI_values"]
         return performance
 
-    def visualize_results(self,fig_name='results.png',sample_size=5): 
-        """Method 2: Randomly select samples and plot predictions."""
-        # Randomly sample indices
-        indices = np.random.choice(len(self.dataset), sample_size, replace=False)
+    def visualize_results(
+        self,
+        fig_name="results.png",
+        sample_size=5,
+        seed=42,
+    ):
+        """Plot representative predictions in a publication-ready layout."""
+        if sample_size < 1:
+            raise ValueError("sample_size must be at least 1.")
+        if sample_size > len(self.dataset):
+            raise ValueError(
+                "sample_size cannot exceed the number of dataset samples."
+            )
+
+        rng = np.random.default_rng(seed)
+        indices = rng.choice(len(self.dataset), sample_size, replace=False)
         subset = Subset(self.dataset, indices)
-        loader = DataLoader(subset, batch_size=sample_size)
+        loader = DataLoader(subset, batch_size=sample_size, shuffle=False)
 
-        input, labels, grid = next(iter(loader))
-        
+        inputs, labels, grid = next(iter(loader))
+
         with torch.no_grad():
-            outputs = self.model(input.to(self.device), grid.to(self.device))
-            outputs = self._to_original_scale(outputs)
-            labels = self._to_original_scale(labels.to(self.device)).cpu()
+            outputs = self.model(
+                inputs.to(self.device),
+                grid.to(self.device),
+            ).reshape(labels.shape)
+            outputs = self._to_original_scale(outputs).cpu()
+            labels = self._to_original_scale(
+                labels.to(self.device)
+            ).cpu()
 
-        # Plotting
-        plt.figure(figsize=(20,8))
-        for i in range(sample_size):
-            plt.subplot(2, sample_size, i + 1)
-            plt.plot(grid[i].cpu().numpy(),labels[i].cpu().numpy(),label = 'Ground Truth')
-            plt.plot(grid[i].cpu().numpy(),outputs[i].cpu().numpy(),label = 'Prediction')
-            plt.legend()
-            plt.subplot(2, sample_size, i+1+sample_size)
-            plt.plot(grid[i].cpu().numpy(),input[i].cpu().numpy(), label = 'Current')
-            plt.legend()
-        plt.tight_layout()
-        plt.savefig(fig_name)
+        # 7.0 in fits the text width of most two-column LaTeX templates.
+        style = {
+            "font.family": "serif",
+            "font.serif": ["STIX Two Text", "STIXGeneral", "DejaVu Serif"],
+            "mathtext.fontset": "stix",
+            "font.size": 8,
+            "axes.labelsize": 8,
+            "axes.titlesize": 8,
+            "xtick.labelsize": 7,
+            "ytick.labelsize": 7,
+            "legend.fontsize": 7,
+            "axes.linewidth": 0.6,
+            "lines.linewidth": 1.1,
+            "xtick.major.width": 0.6,
+            "ytick.major.width": 0.6,
+            "xtick.direction": "in",
+            "ytick.direction": "in",
+            "savefig.dpi": 600,
+        }
+        with plt.rc_context(style):
+            fig, axes = plt.subplots(
+                sample_size,
+                2,
+                figsize=(7.0, 1.35 * sample_size + 0.45),
+                sharex="col",
+                squeeze=False,
+                constrained_layout=True,
+                gridspec_kw={"width_ratios": (1.6, 1.0)},
+            )
+            voltage_min = min(labels.min().item(), outputs.min().item())
+            voltage_max = max(labels.max().item(), outputs.max().item())
+            voltage_padding = 0.05 * (voltage_max - voltage_min)
+            if voltage_padding == 0:
+                voltage_padding = 0.05 * max(abs(voltage_min), 1.0)
+            voltage_limits = (
+                voltage_min - voltage_padding,
+                voltage_max + voltage_padding,
+            )
+
+            for i, (voltage_ax, current_ax) in enumerate(axes):
+                time = grid[i].detach().cpu().numpy().squeeze()
+                target = labels[i].numpy().squeeze()
+                prediction = outputs[i].numpy().squeeze()
+                current = inputs[i].detach().cpu().numpy().squeeze()
+
+                voltage_ax.plot(
+                    time,
+                    target,
+                    color="#222222",
+                    label="Ground truth",
+                    zorder=2,
+                )
+                voltage_ax.plot(
+                    time,
+                    prediction,
+                    color="#0072B2",
+                    linestyle="--",
+                    label="Prediction",
+                    zorder=3,
+                )
+                voltage_ax.set_ylim(voltage_limits)
+                current_ax.plot(time, current, color="#D55E00")
+
+                voltage_ax.set_ylabel(r"$V$")
+                current_ax.set_ylabel(r"$I_{\mathrm{ext}}$")
+                voltage_ax.text(
+                    0.02,
+                    0.92,
+                    f"({chr(97 + i)})",
+                    transform=voltage_ax.transAxes,
+                    ha="left",
+                    va="top",
+                    fontweight="bold",
+                )
+
+                for ax in (voltage_ax, current_ax):
+                    ax.grid(
+                        axis="y",
+                        color="#D9D9D9",
+                        linewidth=0.45,
+                        alpha=0.7,
+                    )
+                    ax.spines["top"].set_visible(False)
+                    ax.spines["right"].set_visible(False)
+                    ax.margins(x=0)
+
+            axes[0, 0].set_title("Membrane potential")
+            axes[0, 1].set_title("Applied current")
+            axes[-1, 0].set_xlabel("Time")
+            axes[-1, 1].set_xlabel("Time")
+
+            handles, legend_labels = axes[0, 0].get_legend_handles_labels()
+            fig.legend(
+                handles,
+                legend_labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 1.065),
+                ncol=2,
+                frameon=False,
+                handlelength=2.4,
+            )
+            fig.savefig(fig_name, bbox_inches="tight", facecolor="white")
+            plt.close(fig)
 
 if __name__ == "__main__":
     models = ["FNO"]
@@ -167,7 +275,11 @@ if __name__ == "__main__":
             _, test_dataset = get_dataset(dataset_name)
             evaluator = ModelEvaluator(test_dataset, model)
             perf = evaluator.calculate_performance()
-            print(f"{model_name}: {perf}")
+            print(model_name, dataset_name)
+            for key, value in perf.items():
+                if not key.endswith("valid_samples"):
+                    print(key, value)
+            print()
             evaluator.visualize_results(
                 fig_name=f"{model_name}_{dataset_name}_test_results.png"
             )
